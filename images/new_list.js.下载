@@ -1,0 +1,583 @@
+/**
+ * 最新商品分类列表
+ * Create By:leiqiang
+ * Create Date:2014-08-15
+ */
+ec.pkg("ec.product");
+ec.load("ajax");
+ec.load("ec.box" , {loadType : "lazy"});
+ec.load("ec.form", {loadType : "lazy"});
+
+//虚拟目录ID
+ec.product.cid = "";
+
+//排序字段
+ec.product.sortField = "";
+
+//排序方式
+ec.product.sortType = "";
+
+//选中的属性值集合
+ec.product.prdAttrList = [];
+
+//绑定邮箱
+ec.product.email = ec.util.escapeHtml(ec.account.email);
+
+//绑定手机号码
+ec.product.mobile = ec.util.escapeHtml(ec.account.mobile);
+
+//选择分类
+ec.product.chooseCategory = function(cid) {
+    ec.product.cid = cid;
+	ec.product.post();
+};
+
+//选择属性"全部"条件
+ec.product.chooseAttrAllValue = function(attributeId) {
+    ec.product.prdAttrList = ec.product.removeAtrribute(ec.product.prdAttrList, "attributeId", attributeId);
+    ec.product.tmpOptAttrValue(attributeId);
+	ec.product.post();
+};
+
+//选择具体的属性条件
+ec.product.chooseAttrValue = function(attributeId,value)
+{
+    //先从当前已选列表中删除该属性
+    ec.product.prdAttrList = ec.product.removeAtrribute(ec.product.prdAttrList, "attributeId", attributeId);
+    ec.product.tmpOptAttrValue(attributeId);
+	
+	//选中属性封装
+	var attr = {};
+	attr.attributeId = attributeId;
+	attr.value = value;
+	
+	//添加到已选属性列表
+	ec.product.prdAttrList.push(attr);
+	
+	ec.product.post();
+};
+
+// 临时紧急处理一下现网3种网络制式混合在一起的处理
+ec.product.tmpOptAttrValue = function(attributeId)
+{
+	if(attributeId == "102435" || attributeId == "102434" || attributeId == "102436") {
+		ec.product.prdAttrList = ec.product.removeAtrribute(ec.product.prdAttrList, "attributeId", "102434");
+		ec.product.prdAttrList = ec.product.removeAtrribute(ec.product.prdAttrList, "attributeId", "102435");
+		ec.product.prdAttrList = ec.product.removeAtrribute(ec.product.prdAttrList, "attributeId", "102436");
+	}
+};
+
+//排序
+ec.product.sort = function(sortField){
+    //当前排序字段
+	cur_sortField = ec.product.sortField || "registterTime",
+	//当前排序
+	cur_sortType = ec.product.sortType || "desc",		
+	//最新排序
+	new_sortType = "";	
+	
+	//获取最新的排序 
+	switch(sortField){
+	    //“默认”条件无需排序值
+		case "default" :
+			new_sortType = "";
+			break;
+		//评论数只支持desc排序	
+		case "remarkNumber" :
+			new_sortType = "desc";
+			break;
+		default :
+		    //如果最新排序字段和当前排序字段相同，变更排序顺序
+			if(sortField == cur_sortField)
+			{
+				new_sortType =  cur_sortType == "desc" ? "asc" : "desc";
+			}
+			else if(sortField == "price")
+			{
+			    //价格默认升序
+				new_sortType = "asc";
+			}
+			else
+			{
+			    //上架时间默认降序
+			    new_sortType = "desc";
+			}
+			break;
+	}
+
+	ec.product.sortType = new_sortType;
+	ec.product.sortField= sortField;
+	ec.product.post();
+};
+
+//点击“更多”分类按钮
+ec.product.more  = function(obj)
+{
+    //当前“更多”按钮状态
+    var cur_more = $(obj).attr("class");	
+	
+	//展开
+    if (cur_more == "more more-expand")
+	{
+		//变为收起状态
+		$(obj).attr("class","more more-drop");		
+		// 获取整个ul的高度
+		var height = $(obj).parent(".p-operate").next(".p-expand").find("ul").first().outerHeight();			
+		//设置展开后整个div的高度
+		$(obj).parent(".p-operate").next(".p-expand").height(height);
+	}
+	// 收起
+	else
+	{
+	    //变为展开状态	
+	    $(obj).attr("class","more more-expand");
+		//删除分类栏固定高度、显示隐藏的分类
+        $(obj).parent(".p-operate").next(".p-expand").removeAttr("style");
+	}
+
+};
+
+
+
+//渲染页面
+ec.product.renderPage = function(cid, prdAttrList, sortField, sortType, page){
+    //各全局变量赋值
+	ec.product.cid = cid;
+    ec.product.sortField=sortField;
+    ec.product.sortType=sortType;
+	
+	//渲染分类
+	ec.product.renderCategory();
+	
+    //渲染属性值列表
+    ec.product.renderAttribute(prdAttrList);
+
+	//渲染排序
+	ec.product.renderSort(sortField, sortType);
+	
+	//加载分页效果
+	if(!page.totalPage || page.totalPage==1)return;
+	
+	if(page.pageNumber){
+		$("#page_"+page.pageNumber +" li").attr("class","page-number link pgCurrent");
+	}
+	if(page.pageNumber ==1){
+		$("#page_ul li").eq(0).attr("class","pgNext link first first-empty"); 
+		$("#page_ul li").eq(1).attr("class","pgNext link pre pre-empty"); 
+	}
+	
+	if(page.pageNumber ==page.totalPage){
+		$("#page_ul .next").addClass("next-empty"); 
+		$("#page_ul .last").addClass("last-empty"); 
+	}
+	
+	if(page.pageNumber > 1){
+		$("#page_ul .first").click(function(){
+			location.href="list-" + ec.product.cid +"-1?sortField="+ec.product.sortField+"&sortType="+ec.product.sortType;
+		});
+		$("#page_ul .pre").click(function(){
+			location.href="list-" + ec.product.cid +"-"+(page.pageNumber-1)+"?sortField="+ec.product.sortField+"&sortType="+ec.product.sortType;
+		});
+	}
+	
+	if(page.pageNumber < page.totalPage){
+		$("#page_ul .next").click(function(){
+			location.href="list-" + ec.product.cid +"-"+(page.pageNumber+1)+"?sortField="+ec.product.sortField+"&sortType="+ec.product.sortType;
+		});
+		$("#page_ul .last").click(function(){
+			location.href="list-" + ec.product.cid +"-"+(page.totalPage)+"?sortField="+ec.product.sortField+"&sortType="+ec.product.sortType;
+		});
+	}	
+};
+
+
+
+
+//渲染分类
+ec.product.renderCategory = function(){
+
+    //变量分类和属性节点，超过行高，显示“更多”按钮
+	$(".p-expand ul").each(function(){
+	    //单个元素的高度
+	    var height = $(this).children("li").first().outerHeight();		
+		//列表的总高度
+	    var toalHeight = $(this).outerHeight();
+        //分类个数超过两行
+	    if(toalHeight > height)
+	    {
+		    //显示更多按钮
+		    $(this).parent(".p-expand").prev(".p-operate").show();
+	    }		
+	});	
+};
+
+
+//渲染属性
+ec.product.renderAttribute = function(prdAttrList){
+    
+    //将所有已选属性条件高亮展示
+    for(var i = 0; i < prdAttrList.length; i++){
+	   	var attrValue = prdAttrList[i];
+		var attributeId = attrValue.attributeId;
+		// 临时处理
+		if(attributeId == "102435" || attributeId == "102434" || attributeId == "102436") {
+			$("#pro-cate-attr-102435").find("#pro-cate-attr-all").removeClass("selected");
+			$("#pro-cate-attr-102434").find("#pro-cate-attr-all").removeClass("selected");
+			$("#pro-cate-attr-102436").find("#pro-cate-attr-all").removeClass("selected");
+
+			$('#pro-cate-attr-102435' + ' li a:contains(' + attrValue.value + ')[innerHTML=' + attrValue.value + ']').parent("li").addClass("selected");
+			$('#pro-cate-attr-102434' + ' li a:contains(' + attrValue.value + ')[innerHTML=' + attrValue.value + ']').parent("li").addClass("selected");
+			$('#pro-cate-attr-102436' + ' li a:contains(' + attrValue.value + ')[innerHTML=' + attrValue.value + ']').parent("li").addClass("selected");
+		}
+		else {
+			//删除改属性下所有选项的selected
+			$("#pro-cate-attr-" + attrValue.attributeId).find("#pro-cate-attr-all").removeClass("selected");
+			
+			//选中每个查询属性的Value值
+			$('#pro-cate-attr-' + attrValue.attributeId + ' li a:contains(' + attrValue.value + ')[innerHTML=' + attrValue.value + ']').parent("li").addClass("selected");
+		}
+	}
+	//为全局变量添加attributeId属性
+	ec.product.prdAttrList = prdAttrList;
+};
+
+//渲染排序
+ec.product.renderSort = function(sortField, sortType){
+    //高亮选中的排序条件 
+	switch(sortField){
+		case "default" :
+			break;
+		case "remarkNumber" :
+			$("#sort-remarkNumber").addClass("sort-desc");
+			break;
+		default :
+			$("#sort-" + sortField).addClass("sort-"+sortType);
+			break;
+	}
+	$("#sort-" + sortField).addClass("selected");
+};
+
+// 统一发送请求方法
+ec.product.post = function(page)
+{
+    //默认第一页
+    var pageNumber = (page ?  page : 1);
+	var cid = ec.product.cid;
+	var prdAttrList = ec.lang.json.stringify(ec.product.prdAttrList);
+	document.getElementById("sortField").value=ec.product.sortField;
+	document.getElementById("sortType").value=ec.product.sortType;
+	document.getElementById("prdAttrList").value=prdAttrList;
+	$("#listForm").attr("action", "/list-" + cid +"-" + pageNumber);
+    $("#listForm").submit();
+};
+
+//到货通知
+ec.product.arrival = function(skuId){
+	ec.account.afterLogin(function(){
+	    //更新用户信息
+        ec.product.syncCustomSession();
+		var email = ec.product.email;
+		var mobile = ec.product.mobile;
+		//到货通知方式
+		var noticeType = "";
+		
+		var box = new ec.box($("#product-arrival-html").val() , {
+			boxid : "product-arriva-box",
+			boxclass : "ol_box_4",
+			title : "到货通知",
+			showButton : false,
+			onopen : function(box){
+			
+				//判断用户是否已经绑定邮箱或手机号码	
+				if(ec.util.isEmpty(email))
+				{
+				    $("#arrival-email").attr('class','disabled');	
+				    $("#account-email").html('未绑定安全邮箱&nbsp;<a href="/member/account" target="_blank" onclick="ec.product.bind()">去绑定</a>');
+				}
+				else
+				{
+				    $("#arrival-email").bind("click",function () {
+                        noticeType = ec.product.chooseNoticeType('email');
+                    });
+				    $("#account-email").html(email);
+				}
+				
+				if(ec.util.isEmpty(mobile))
+				{
+					$("#arrival-mobile").attr('class','disabled');
+				    $("#account-mobile").html('未绑定安全手机&nbsp;<a href="/member/account" target="_blank" onclick="ec.product.bind()">去绑定</a>');
+				}
+				else
+				{
+					$("#arrival-mobile").bind("click",function () {
+                        noticeType = ec.product.chooseNoticeType('mobile');
+                    });
+				    $("#account-mobile").html(ec.product.splitMobile(mobile));
+				}
+			},
+			onok : function(box){
+
+			    //一个都没选
+				if(noticeType.length == 0)
+				{
+					$("#arrival-error span").html("请选择一种通知方式！");
+					$("#arrival-error").removeClass("hide");
+					return;
+				}
+				
+			    //默认为邮件提醒
+                var type = "1";
+				var informWay = email;
+				if(noticeType == "mobile")
+				{ 
+				    type = "3";
+					informWay = mobile;
+				}
+				
+				//请求到货通知接口
+				new ec.ajax().submit({
+				url : "/product/arrivalMail.json",
+				data : {
+					informWay : informWay,
+					type : type,
+					skuId : skuId
+				},
+				timeout : 10000,
+				timeoutFunction : function() {					    
+					$("#arrival-error span").html("操作超时，请重试！");
+					$("#arrival-error").removeClass("hide");
+					//alert("操作超时，请重试！");
+				},
+				beforeSendFunction : ec.ui.loading.show,
+				afterSendFunction : ec.ui.loading.hide,
+				successFunction : function(json){
+					if(!json.success)
+					{
+					    $("#arrival-error span").html(json.msg);
+					    $("#arrival-error").removeClass("hide");
+						//ec.showError(json);
+						return;
+					}
+					alert("设置成功！");
+					$("#arrival-error").addClass("hide");
+					box.close();
+					$(".ol_box_mask").remove();
+				}
+			});
+			},
+			onclose : function(box){					    
+				$(".ol_box_mask").remove();
+			}
+		});
+		box.open();
+		
+		//点击去绑定的同时，关闭到货通知对话框
+        ec.product.bind = function () {
+            box.close();
+	        $(".ol_box_mask").remove();
+        };
+	});
+};
+
+//记录用户选择的通知方式
+ec.product.chooseNoticeType = function (type) {
+    
+    //清除所有选中状态
+    $("#arrival-email").removeClass("selected");
+    $("#arrival-mobile").removeClass("selected");
+    
+    //选中选择的通知方式
+	$("#arrival-" + type).attr('class','selected');
+	
+	return type;
+};
+
+
+//分割手机号码（倒数每4位加两个空格）
+ec.product.splitMobile = function(mobile)
+{
+    var result = "";
+    for(var i = 0; i < (mobile.length) ; i++){
+	
+		if((mobile.length - i) % 4 == 0)
+        {
+		    result +='&nbsp;&nbsp;';
+		}			
+		result += mobile.substring(i, i+1);			
+	}
+    return result;
+};
+
+//同步UP信息，更新session
+ec.product.syncCustomSession = function()
+{
+	new ec.ajax().get({
+		async:false,//使用同步的Ajax请求
+		url: "/account/syncEmailAndMobile.json", 
+		timeout : 10000,
+		successFunction : function(json){
+		    if(!ec.util.isEmpty(json.customerInfo))
+			{
+			    ec.product.email = json.customerInfo.email;
+				ec.product.mobile = json.customerInfo.mobile;
+			}
+			return;
+		},
+		timeoutFunction : function(){
+			return;
+		},
+		errorFunction : function(){
+			return;
+		}
+	});
+};
+
+
+//禁用“加入购物车”按钮
+ec.product.disableAddCartButtons = function(skuId)
+{
+	$("#add-cat-" + skuId).attr("class", "p-button-cart-disabled");
+};
+
+//“加入购物车”按钮恢复可用
+ec.product.enableAddCartButtons = function(skuId)
+{
+	$("#add-cat-" + skuId).attr("class", "p-button-cart");
+};
+
+
+//加入购物车
+ec.product.addCart = function(skuId, briefName){
+    //禁用“加入购物车”按钮
+	ec.product.disableAddCartButtons(skuId);
+	
+	//定义添加到购物车的ajax的参数
+	var paras;
+	
+	//定义所有商品（单品+服务商品）的SkuId数组
+	var allSkuIds=[];
+	allSkuIds[0]=skuId;
+	
+	//定义服务商品对应的单品的skuId数组
+	var extendSkuId=[];
+	extendSkuId[0]="";	
+	
+	//定义所有商品的类型（单品加上延保商品或者意外保商品的商品类型）
+    var types=[];
+    types[0]=1;	
+	
+    //定义所有商品的数量（单品加上延保商品或者意外保商品）
+    var quantities=[];
+	quantities[0]=1; 
+        
+	paras = { 
+		skuIds : allSkuIds,
+		extendSkuIds : extendSkuId,
+		quantity : quantities,
+		type : types
+	};
+	//调用购物车方法
+	ec.cart.add(paras, {
+		successFunction : function(json){
+			ec.cart.getMicroCartBaseInfo(json.cart, function(json)
+			{
+		        var box = new ec.box($("#cart-tips").val() , {
+					boxid : "product-cart-box",
+					boxclass : "ol_box_4",
+					showButton : false,
+					onopen: function(box){
+				        $("#cart-briefName").html(briefName);
+				       var cartInfo=json.cartInfo;
+				        $("#cart-total, #header-cart-total").html(cartInfo.totalNumber);
+				      //changruping add start
+						var totalOriginalPrice = 0;
+						var totalPrice = 0;
+						var preferentialPrice = 0;		
+						
+								//选中的商品，不包括在返回套餐数据的列表中
+								for (var j = 0; j < cartInfo.bundlerList.length; j++)
+								{
+									var bundle = cartInfo.bundlerList[j];				
+										totalOriginalPrice += bundle['originalPrice']*bundle['quantity'] ;
+										preferentialPrice += bundle['preferentialPrice'];	
+								}
+					
+								for (var x = 0; x < cartInfo.productList.length; x++)
+								{
+									var product = cartInfo.productList[x];
+									var quantity = product['quantity'];				
+										totalOriginalPrice += product['ecshopPrice']*quantity;
+										preferentialPrice += (product['ecshopPrice'] - product['skuPrice'])*quantity;
+										//对意外保和延保进行重新算价
+										if(product['extendList'].length > 0 ){
+											for(var y = 0 ; y < product['extendList'].length ; y++){
+												var extentPrd = product['extendList'][y];
+												var price = extentPrd['skuPrice'];
+												totalOriginalPrice += price*quantity;
+											}
+										}
+										if(product['accidentList'].length >0){
+											for(var z = 0 ; z < product['accidentList'].length ; z++){
+												var accidentPrd = product['accidentList'][z];
+												var price = accidentPrd['skuPrice'];
+												totalOriginalPrice += price*quantity;
+											}
+										}
+									
+									}
+						//加上订单优惠的价格		
+						totalPrice = totalOriginalPrice - preferentialPrice ;
+						//changruping add end
+				        $("#cart-price").html(totalPrice.toFixed(2));
+					},
+					onok : function(box){
+					    ec.product.gotoshoppingCart();
+					},
+					oncancel : function(box){
+					    box.close();
+						$(".ol_box_mask").remove();
+					},
+					onclose : function(box){					    
+						$(".ol_box_mask").remove();
+					}
+				});
+				box.open();
+			});
+			//按钮恢复可用
+			ec.product.enableAddCartButtons(skuId);
+		},
+		errorFunction : function(json){
+		    var box = new ec.box($("#popup-tips").val() , {
+				boxid : "product-popup-box",
+				boxclass : "ol_box_4",
+				showButton : false,
+				onopen: function(box){
+			        $("#popup-tips-msg").html(json.msg);
+				},
+				oncancel : function(box){
+					box.close();
+				    $(".ol_box_mask").remove();
+				},
+				onclose : function(box){
+					$(".ol_box_mask").remove();
+				}
+			});
+			box.open();
+			ec.product.enableAddCartButtons(skuId);
+		}
+	});
+};
+
+/** 
+* 从对象数组中删除属性为objPropery，值为objValue元素的对象 
+* @param Array attrList 数组对象 
+* @param String objPropery 对象的属性 
+* @param String objPropery 对象的值 
+* @return Array 过滤后数组 
+*/ 
+ec.product.removeAtrribute = function(attrList, objPropery, objValue) 
+{
+    return $.grep(attrList, function(cur,i){
+        return cur[objPropery]!=objValue; 
+    }); 
+};

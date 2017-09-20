@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <script src="js/jquery-1.11.3.js"></script>
+    <style>
+
+        * {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            text-decoration: none;
+            box-sizing: border-box;
+        }
+
+        a {
+            color: #000;
+        }
+
+        .container {
+            width: 500px;
+            height: 640px;
+            border: 2px solid #000;
+            padding: 5px;
+            overflow: hidden;
+            margin: 10px 100px;
+        }
+
+        .container .onshow {
+            width: 100%;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        .container .preview {
+            width: 100%;
+            height: 160px;
+            position: relative;
+            /*padding: 10px 0;*/
+        }
+
+        .container .preview ul {
+            width: 5000px;
+            height: 100%;
+            overflow: hidden;
+            position: absolute;
+            left: 0;
+            top: 0;
+            margin: 10px 0;
+        }
+
+        .container .preview ul li {
+            float: left;
+            border: 1px solid #fff;
+        }
+
+        .container .preview ul li img {
+            width: 120px;
+            height: 120px;
+        }
+
+        .container .preview .btns {
+            width: 100%;
+            height: 60px;
+            position: absolute;
+            top: 50%;
+            margin-top: -30px;
+            left: 0;
+            /*pointer-events: none;*/
+            /*
+                css hack:作用是：根据不同的浏览器内核，使用不同的写法，处理兼容性问题
+                前提是：浏览器支持这样的属性和样式。
+            */
+
+        }
+
+        .container .preview .btns a {
+            float: left;
+            display: block;
+            width: 36px;
+            height: 100%;
+            text-align: center;
+            line-height: 60px;
+            color: #ffffff;
+            font-size: 24px;
+            margin-left: 10px;
+            background-color: rgba(0, 0, 0, .6);
+        }
+
+        .container .preview a:last-child {
+            float: right;
+            margin-right: 10px;
+        }
+
+        .active_pic {
+            border: 1px solid red !important;
+        }
+    </style>
+</head>
+<script>
+    $(function () {
+        //获得所有的li标签，给每一个li标签绑定单击事件
+        $(".container .preview li").each(function () {
+            $(this).click(function () {
+                //在事件处理函数中，获得li标签中的img标签的src属性，将onshow中的img标签的src属性值替换
+                $(".container .onshow img").attr("src", $(this).find("img").attr("src"));
+                //将li标签的兄弟元素移除边框的类样式，给当前点击的li添加边框的类样式
+                $(this).siblings().removeClass("active_pic");
+                $(this).addClass("active_pic");
+            });
+        });
+
+        var cpage = 1;//当前页
+        var pageSize = 4; //每页显示的个数
+        var totalCount = $(".container .preview li").length; //li的个数长度
+        var liWidth = $(".container .preview li:eq(0)").outerWidth(); //li的宽度加上border+padding
+        var totalPage = totalCount / pageSize == 0 ? totalCount / pageSize : Math.floor(totalCount / pageSize) + 1;//页数
+        //页数=每个li的长度*每页的个数如果能整出就让他等于它除它的总和，如果不等于0就让他向下取整然后让他的个页数+1
+        $("#right_btn").click(function () {
+            if (cpage < totalPage) {
+                //如果当前页小于总长度
+                //如果当前页小于页数 让ul的left=-li的宽度×每页的个数×当前页++ 加px
+                $(".container .preview ul").css("left", -liWidth * pageSize * (++cpage) + "px");
+            }
+        });
+        $("#left_btn").click(function () {
+            if (cpage > 0) {
+                //如果当前页>的话让他的宽度——
+                $(".container .preview ul").css("left", -liWidth * pageSize * (--cpage) + "px");
+            }
+        });
+
+    });
+</script>
+<body>
+<!--
+    放大镜效果：
+    明确效果：在容器中，有一张大图，大图下有一排预览小图，如果有多个小图，则分页显示
+    点击预览小图，则在大图区域中，显示预览图的对应大图
+-->
+<div class="container">
+    <div class="onshow">
+        <img src="images/428_428_1481251216636mp.jpg"/>
+    </div>
+    <div class="preview">
+        <ul>
+            <li class="active_pic"><img src="images/428_428_1500952937405mp.jpg"></li>
+            <li><img src="images/428_428_1481251216636mp.jpg" alt=""/></li>
+            <li><img src="images/428_428_1477529981662mp.jpg" alt=""/></li>
+            <li><img src="images/428_428_1488119937007mp.jpg" alt=""/></li>
+            <li><img src="images/428_428_1477529981662mp.jpg" alt=""/></li>
+            <li><img src="images/428_428_1490083411321mp.jpg" alt=""/></li>
+            <li><img src="images/428_428_1500952937405mp.jpg" alt=""/></li>
+            <li><img src="images/428_428_1481251216636mp.jpg" alt=""/></li>
+            <li><img src="images/428_428_1477529981662mp.jpg" alt=""/></li>
+            <li><img src="images/428_428_1488119937007mp.jpg" alt=""/></li>
+            <li><img src="images/428_428_1477529981662mp.jpg" alt=""/></li>
+            <li><img src="images/428_428_1490083411321mp.jpg" alt=""/></li>
+            <li><img src="images/428_428_1500952937405mp.jpg" alt=""/></li>
+
+        </ul>
+        <div class="btns">
+            <a id="left_btn" href="javascript:void(0);"><</a>
+            <a id="right_btn" href="javascript:void(0);">></a>
+        </div>
+    </div>
+</div>
+</body>
+</html>
